@@ -5,6 +5,7 @@
 import uuid from "react-native-uuid"
 import promiseReflect from "promise-reflect"
 import _ from "lodash"
+import moment from "moment"
 
 // Local
 import database from "../storage/database"
@@ -101,6 +102,7 @@ export class Queue {
       active: false,
       timeout: options.timeout >= 0 ? options.timeout : 25000,
       created: new Date(),
+      executeDate: options.executeDate || moment().format(),
       failed: null,
     })
 
@@ -143,7 +145,10 @@ export class Queue {
       while (this.status === "active" && concurrentJobs.length) {
         // Loop over jobs and process them concurrently.
         const processingJobs = concurrentJobs.map(job => {
-          return this.processJob(job)
+          // Check that the execute date is today
+          if (moment().isSame(moment(job.executeDate), "day")) {
+            return this.processJob(job)
+          }
         })
 
         // Promise Reflect ensures all processingJobs resolve so
