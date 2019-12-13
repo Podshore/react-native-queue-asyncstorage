@@ -5,6 +5,7 @@
 import uuid from "react-native-uuid"
 import promiseReflect from "promise-reflect"
 import _ from "lodash"
+import moment from "moment"
 
 // Local
 import database from "../storage/database"
@@ -101,6 +102,7 @@ export class Queue {
       active: false,
       timeout: options.timeout >= 0 ? options.timeout : 25000,
       created: new Date(),
+      executeDate: options.executeDate || moment().format(),
       failed: null,
     })
 
@@ -208,9 +210,21 @@ export class Queue {
       let jobs = this.database.objects()
       jobs = queueLifespanRemaining
         ? jobs.filter(
-            j => !j.active && j.failed === null && j.timeout > 0 && j.timeout < timeoutUpperBound,
+            j =>
+              !j.active &&
+              j.failed === null &&
+              j.timeout > 0 &&
+              j.timeout < timeoutUpperBound &&
+              (moment().isSame(moment(j.executeDate), "day") ||
+                moment().isAfter(moment(j.executeDate))),
           )
-        : jobs.filter(j => !j.active && j.failed === null)
+        : jobs.filter(
+            j =>
+              !j.active &&
+              j.failed === null &&
+              (moment().isSame(moment(j.executeDate), "day") ||
+                moment().isAfter(moment(j.executeDate))),
+          )
       jobs = _.orderBy(jobs, ["priority", "created"], ["desc", "asc"])
       // NOTE: here and below 'created' is sorted by 'asc' however in original it's 'desc'
 
@@ -230,9 +244,18 @@ export class Queue {
                 !j.active &&
                 j.failed === null &&
                 j.timeout > 0 &&
-                j.timeout < timeoutUpperBound,
+                j.timeout < timeoutUpperBound &&
+                (moment().isSame(moment(j.executeDate), "day") ||
+                  moment().isAfter(moment(j.executeDate))),
             )
-          : allRelatedJobs.filter(j => j.name === nextJob.name && !j.active && j.failed === null)
+          : allRelatedJobs.filter(
+              j =>
+                j.name === nextJob.name &&
+                !j.active &&
+                j.failed === null &&
+                (moment().isSame(moment(j.executeDate), "day") ||
+                  moment().isAfter(moment(j.executeDate))),
+            )
         allRelatedJobs = _.orderBy(allRelatedJobs, ["priority", "created"], ["desc", "asc"])
 
         let jobsToMarkActive = allRelatedJobs.slice(0, concurrency)
