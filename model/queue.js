@@ -145,10 +145,7 @@ export class Queue {
       while (this.status === "active" && concurrentJobs.length) {
         // Loop over jobs and process them concurrently.
         const processingJobs = concurrentJobs.map(job => {
-          // Check that the execute date is today
-          if (moment().isSame(moment(job.executeDate), "day")) {
-            return this.processJob(job)
-          }
+          return this.processJob(job)
         })
 
         // Promise Reflect ensures all processingJobs resolve so
@@ -213,7 +210,13 @@ export class Queue {
       let jobs = this.database.objects()
       jobs = queueLifespanRemaining
         ? jobs.filter(
-            j => !j.active && j.failed === null && j.timeout > 0 && j.timeout < timeoutUpperBound,
+            j =>
+              !j.active &&
+              j.failed === null &&
+              j.timeout > 0 &&
+              j.timeout < timeoutUpperBound &&
+              (moment().isSame(moment(j.executeDate), "day") ||
+                moment().isAfter(moment(j.executeDate))),
           )
         : jobs.filter(j => !j.active && j.failed === null)
       jobs = _.orderBy(jobs, ["priority", "created"], ["desc", "asc"])
@@ -235,7 +238,9 @@ export class Queue {
                 !j.active &&
                 j.failed === null &&
                 j.timeout > 0 &&
-                j.timeout < timeoutUpperBound,
+                j.timeout < timeoutUpperBound &&
+                (moment().isSame(moment(j.executeDate), "day") ||
+                  moment().isAfter(moment(j.executeDate))),
             )
           : allRelatedJobs.filter(j => j.name === nextJob.name && !j.active && j.failed === null)
         allRelatedJobs = _.orderBy(allRelatedJobs, ["priority", "created"], ["desc", "asc"])
