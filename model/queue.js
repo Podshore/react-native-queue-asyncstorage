@@ -218,7 +218,13 @@ export class Queue {
               (moment().isSame(moment(j.executeDate), "day") ||
                 moment().isAfter(moment(j.executeDate))),
           )
-        : jobs.filter(j => !j.active && j.failed === null)
+        : jobs.filter(
+            j =>
+              !j.active &&
+              j.failed === null &&
+              (moment().isSame(moment(j.executeDate), "day") ||
+                moment().isAfter(moment(j.executeDate))),
+          )
       jobs = _.orderBy(jobs, ["priority", "created"], ["desc", "asc"])
       // NOTE: here and below 'created' is sorted by 'asc' however in original it's 'desc'
 
@@ -242,7 +248,14 @@ export class Queue {
                 (moment().isSame(moment(j.executeDate), "day") ||
                   moment().isAfter(moment(j.executeDate))),
             )
-          : allRelatedJobs.filter(j => j.name === nextJob.name && !j.active && j.failed === null)
+          : allRelatedJobs.filter(
+              j =>
+                j.name === nextJob.name &&
+                !j.active &&
+                j.failed === null &&
+                (moment().isSame(moment(j.executeDate), "day") ||
+                  moment().isAfter(moment(j.executeDate))),
+            )
         allRelatedJobs = _.orderBy(allRelatedJobs, ["priority", "created"], ["desc", "asc"])
 
         let jobsToMarkActive = allRelatedJobs.slice(0, concurrency)
