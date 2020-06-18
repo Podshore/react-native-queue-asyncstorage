@@ -25,9 +25,9 @@
   },
   "homepage": "https://github.com/billmalarky/react-native-queue#readme",
   "dependencies": {
-    "@react-native-community/async-storage": "^1.6.3",
-    "lodash": "^4.17.11",
-    "moment": "^2.24.0",
+    "@react-native-community/async-storage": "^1.11.0",
+    "lodash": "^4.17.15",
+    "moment": "^2.26.0",
     "promise-reflect": "^1.1.0",
     "react-native-uuid": "^1.4.9"
   },
