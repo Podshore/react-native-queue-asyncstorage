@@ -63,8 +63,9 @@ export default class Database {
     let shouldSkip = false
 
     // Check if job is already in the database, skip if so.
-    for (let i = 0; i < this.database.length; i += 1) {
-      if (this.database[i] === job.id) shouldSkip = true
+    const found = _.find(this.database, item => item.id === job.id)
+    if (found) {
+      shouldSkip = true
     }
 
     // If the job doesn't already exist, add it to the database.
@@ -83,8 +84,9 @@ export default class Database {
    * Update a job already existing in the database.
    */
   update = async job => {
-    for (let i = 0; i < this.database.length; i += 1) {
-      if (this.database[i] === job.id) this.database[i] = job
+    const index = _.findIndex(this.database, item => item.id === job.id)
+    if (index) {
+      this.database[index] = job
     }
     await this._backup()
   }
