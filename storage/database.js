@@ -1,6 +1,7 @@
 /**
  * Database implementation using AsyncStorage
  */
+import _ from "lodash"
 
 // Local
 import storage from "./storage"
@@ -61,6 +62,7 @@ export default class Database {
    */
   addJob = async job => {
     let shouldSkip = false
+    console.log("*** queue - Adding job to queue:", JSON.stringify(job))
 
     // Check if job is already in the database, skip if so.
     const found = _.find(this.database, item => item.id === job.id)
@@ -68,11 +70,16 @@ export default class Database {
       shouldSkip = true
     }
 
+    console.log("*** queue - Job found in database:", JSON.stringify(found))
+
     // If the job doesn't already exist, add it to the database.
     if (!shouldSkip) {
       this.database.push(job)
+      console.log("*** queue - job added:", JSON.stringify(this.database))
       await this._backup()
     }
+
+    return true
   }
 
   /**
@@ -85,10 +92,15 @@ export default class Database {
    */
   update = async job => {
     const index = _.findIndex(this.database, item => item.id === job.id)
-    if (index) {
+
+    console.log("*** queue - trying to update:", job, "at index:", index)
+
+    if (index !== -1) {
       this.database[index] = job
+      console.log("*** queue - job updated:", job)
     }
     await this._backup()
+    return true
   }
 
   /**
@@ -103,7 +115,10 @@ export default class Database {
    * Delete a job.
    */
   delete = async job => {
-    this.database = this.database.filter(o => o.id !== job.id)
+    this.database = _.filter(this.database, item => item.id !== job.id)
+
+    console.log("*** queue - job deleted:", JSON.stringify(this.database))
+
     await this._backup()
   }
 
