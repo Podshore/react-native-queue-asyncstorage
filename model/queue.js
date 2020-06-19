@@ -8,8 +8,8 @@ import _ from "lodash"
 import moment from "moment"
 
 // Local
-import database from "../storage/database"
-import worker from "./worker"
+import Database from "../storage/database"
+import Worker from "./worker"
 
 export class Queue {
   /**
@@ -19,7 +19,7 @@ export class Queue {
    */
   constructor(executeFailedJobsOnStart = false) {
     this.database = null
-    this.worker = new worker()
+    this.worker = new Worker()
     this.status = "inactive"
     this.executeFailedJobsOnStart = executeFailedJobsOnStart
   }
@@ -29,7 +29,7 @@ export class Queue {
    */
   init = async () => {
     if (this.database === null) {
-      this.database = new database()
+      this.database = new Database()
       await this.database.init()
     }
   }
@@ -110,6 +110,8 @@ export class Queue {
     if (start && this.status === "inactive") {
       this.start()
     }
+
+    return true
   }
 
   /**
@@ -142,6 +144,8 @@ export class Queue {
         concurrentJobs = await this.getConcurrentJobs()
       }
 
+      console.log("*** queue - concurrent jobs (before processing):", concurrentJobs)
+
       while (this.status === "active" && concurrentJobs.length) {
         // Loop over jobs and process them concurrently.
         const processingJobs = concurrentJobs.map(job => {
@@ -162,7 +166,7 @@ export class Queue {
         }
       }
     } catch (error) {
-      console.log("*** Error processing queue:", JSON.stringify(error))
+      console.log("*** queue - Error processing queue:", JSON.stringify(error))
       return false
     }
 
@@ -227,6 +231,7 @@ export class Queue {
           )
       jobs = _.orderBy(jobs, ["priority", "created"], ["desc", "asc"])
       // NOTE: here and below 'created' is sorted by 'asc' however in original it's 'desc'
+      console.log("*** queue - concurrent jobs:", JSON.stringify(jobs))
 
       if (jobs.length) {
         nextJob = jobs[0]
@@ -265,8 +270,10 @@ export class Queue {
         const concurrentJobIds = jobsToMarkActive.map(job => job.id)
 
         // Mark concurrent jobs as active
-        jobsToMarkActive = jobsToMarkActive.map(job => {
-          job.active = true
+        jobsToMarkActive = _.map(jobsToMarkActive, job => {
+          const clone = { ...job }
+          clone.active = true
+          return clone
         })
 
         // Reselect now-active concurrent jobs by id.
@@ -277,7 +284,7 @@ export class Queue {
         concurrentJobs = reselectedJobs.slice(0, concurrency)
       }
     } catch (error) {
-      console.log("*** Error getting concurrent jobs:", { error })
+      console.log("*** queue - Error getting concurrent jobs:", { error })
     }
 
     return concurrentJobs
@@ -296,27 +303,29 @@ export class Queue {
     // Data must be cloned off the job object for several lifecycle callbacks to work correctly.
     // This is because job is deleted before some callbacks are called if job processed successfully.
     // More info: https://github.com/billmalarky/react-native-queue/issues/2#issuecomment-361418965
-    const name = job.name
-    const id = job.id
-    const payload = JSON.parse(job.payload)
+    const clone = { ...job }
+    const { name } = clone
+    const { id } = clone
+    const payload = JSON.parse(clone.payload)
 
     // Fire onStart job lifecycle callback
     this.worker.executeJobLifecycleCallback("onStart", name, id, payload)
 
     try {
-      const executionResult = await this.worker.executeJob(job)
+      const executionResult = await this.worker.executeJob(clone)
       if (!executionResult) throw new Error("Execution failure")
 
       // On successful job completion, remove job
-      this.database.delete(job)
+      this.database.delete(clone)
 
       // Job has processed successfully, fire onSuccess and onComplete job lifecycle callbacks.
       this.worker.executeJobLifecycleCallback("onSuccess", name, id, payload)
       this.worker.executeJobLifecycleCallback("onComplete", name, id, payload)
+      return true
     } catch (error) {
-      console.log("*** Queue - processJob - error:", { error })
+      console.log("*** queue - processJob - error:", { error })
       // Handle job failure logic, including retries.
-      const data = JSON.parse(job.data)
+      const data = JSON.parse(clone.data)
 
       // Increment failed attempts number
       if (!data.failedAttempts) {
@@ -332,25 +341,26 @@ export class Queue {
         data.errors.push(error.message)
       }
 
-      job.data = JSON.stringify(data)
+      clone.data = JSON.stringify(data)
 
       // Reset active status
-      job.active = false
+      clone.active = false
 
       // Mark job as failed if too many attempts
       if (data.failedAttempts >= data.attempts) {
-        job.failed = new Date()
+        clone.failed = new Date()
       }
 
-      this.database.update(job)
+      await this.database.update(clone)
 
       // Execute job onFailure lifecycle callback.
       if (
         // filter network errors
         error.message.indexOf("TIMEOUT") !== -1 ||
         error.message.indexOf("Network request failed") !== -1
-      )
+      ) {
         return false
+      }
 
       if (data.failedAttempts === 1 || data.failedAttempts === data.attempts) {
         // report only first and last error
@@ -362,6 +372,8 @@ export class Queue {
         this.worker.executeJobLifecycleCallback("onFailed", name, id, payload, error)
         this.worker.executeJobLifecycleCallback("onComplete", name, id, payload)
       }
+
+      return false
     }
   }
 

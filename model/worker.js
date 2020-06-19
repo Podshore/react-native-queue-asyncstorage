@@ -70,9 +70,9 @@ export default class Worker {
       throw new Error(`Job ${job.name} does not have a worker assigned to it.`)
     }
 
-    const id = job.id
-    const name = job.name
-    const timeout = job.timeout
+    const { id } = job
+    const { name } = job
+    const { timeout } = job
     const payload = JSON.parse(job.payload)
 
     // Run job with timeout to enforce set timeout value.
@@ -111,7 +111,7 @@ export default class Worker {
       try {
         await Worker.workers[name].options[callback](id, payload, error)
       } catch (error) {
-        console.log("*** Worker - executeJobLifecycleCallback - error:", error)
+        console.log("*** queue - Worker - executeJobLifecycleCallback - error:", error)
       }
     }
   }
